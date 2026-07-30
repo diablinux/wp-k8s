@@ -1,0 +1,93 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: wp-k8s-repo
+  namespace: flux-system
+spec:
+  interval: 1m
+  url: https://github.com/REPLACE_ME_ORG/wp-k8s
+  ref:
+    branch: main
+
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: wordpress-customer006
+  namespace: flux-system
+spec:
+  interval: 5m
+  releaseName: wordpress-customer006
+  targetNamespace: customer006
+  storageNamespace: flux-system
+  chart:
+    spec:
+      chart: ./wpk8s-stack
+      sourceRef:
+        kind: GitRepository
+        name: wp-k8s-repo
+        namespace: flux-system
+      interval: 1m
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  values:
+    cluster:
+      customerName: customer006
+      workerNode: worker03
+    replicaCount: 1
+    database:
+      service:
+        user: wpuser
+        name: wordpress
+      secret:
+        create: false
+        name: mysql-secrets
+        data:
+          password: CHANGE_ME_BASE64_DB_PASSWORD
+          rootPassword: CHANGE_ME_BASE64_DB_ROOT_PASSWORD
+    wordpress:
+      version: 7.0.0
+      secret:
+        name: wordpress-secrets
+        keys:
+          authKey: auth-key
+          secureAuthKey: secure-auth-key
+          loggedInKey: logged-in-key
+          nonceKey: nonce-key
+          authSalt: auth-salt
+          secureAuthSalt: secure-auth-salt
+          loggedInSalt: logged-in-salt
+          nonceSalt: nonce-salt
+    network:
+      domain: customer006.web-services.sytes.net
+      ingress:
+        gatewayName: public-gateway
+        sectionName: https
+        namespace: default
+    monitoring:
+      allowedMetricsIPs:
+        - 192.168.51.96
+        - 192.168.0.145
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 4
+      targetCPUUtilizationPercentage: 95
+      targetMemoryUtilizationPercentage: 95
+    resources:
+      wordpress:
+        cpuRequests: 50m
+        cpuLimits: 100m
+        memoryRequests: 192Mi
+        memoryLimits: 256Mi
+      mysql:
+        cpuRequests: 50m
+        cpuLimits: 100m
+        memoryRequests: 464Mi
+        memoryLimits: 966Mi
+    serverAdminEmail: acabrera@web-services.sytes.net

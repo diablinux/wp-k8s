@@ -1,0 +1,19 @@
+# Keep safe example files tracked
+!values-example.yaml
+!values.example.yaml
+!vars.example.yaml
+
+# Ignore local/untracked values overrides that may contain real credentials
+values-*.local.yaml
+values-*.private.yaml
+wpk8s-stack/values.local.yaml
+wpk8s-stack/values.private.yaml
+wpk8s-stack/values-customer*.private.yaml
+
+# Ignore local plaintext secret override manifests
+clusters/**/wordpress-instances/*-secrets.private.yaml
+
+# macOS and chart metadata noise
+wpk8s-stack/.helmignore
+wpk8s-stack/.DS_Store
+wpk8s-stack/templates/.DS_Store

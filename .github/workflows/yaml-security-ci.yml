@@ -1,0 +1,58 @@
+name: YAML Security CI
+
+on:
+  pull_request:
+    branches-ignore:
+      - main
+  push:
+    branches-ignore:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  yaml-lint-and-secret-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install yaml linter
+        run: pip install yamllint
+
+      - name: Run yamllint
+        run: yamllint .
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Helm lint chart
+        run: helm lint ./wpk8s-stack -f ./values-example.yaml
+
+      - name: Helm template validation
+        run: helm template wordpress-stack ./wpk8s-stack -f ./values-example.yaml > /tmp/rendered.yaml
+
+      - name: Detect forbidden plaintext secret patterns in YAML
+        run: |
+          set -euo pipefail
+          regex='(password|passwd|rootPassword|wordpressPassword|authKey|secureAuthKey|loggedInKey|nonceKey|authSalt|secureAuthSalt|loggedInSalt|nonceSalt)\s*:\s*(?!CHANGE_ME|ENC\[|\$\{)("[^"]+"|\x27[^\x27]+\x27|[^[:space:]#]+)'
+          matches=$(rg -n --glob "*.yml" --glob "*.yaml" -P "$regex" . || true)
+          if [[ -n "$matches" ]]; then
+            echo "Forbidden plaintext secret-like values detected in YAML files:"
+            echo "$matches"
+            exit 1
+          fi
+
+      - name: Secret scan with Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
